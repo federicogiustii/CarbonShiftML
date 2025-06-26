@@ -1,4 +1,3 @@
-
 import pika
 import json
 import random
@@ -12,8 +11,8 @@ def load_strategies_csv(path="strategies.csv"):
         for row in reader:
             strategies.append({
                 "name": row["name"],
-                "error": int(row["error"]),
-                "duration": int(row["duration"])
+                "error": int(float(row["error"])),
+                "duration": int(float(row["duration"]))
             })
     return strategies
 
@@ -26,7 +25,7 @@ def load_scheduler_config_csv(path="scheduler_config.csv"):
     with open(path, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            config[row["parameter"]] = int(row["value"])
+            config[row["parameter"]] = int(float(row["value"]))
     return config
 
 def carbon_shift_strategy():
