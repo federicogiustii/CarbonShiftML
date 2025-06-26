@@ -1,16 +1,15 @@
 """
 # Random: Random load per slot (realistic variation)
-python universal_clientML3.py --mode random --scale 1 --slots 10
+python universal_clientML3.py --mode random --scale 1 --slots 10 --task "Text Generation"
 
 # Linear: Load increases linearly with slot index (slot 0: low, slot 9: high)
-python universal_clientML3.py --mode linear --scale 1 --slots 10
+python universal_clientML3.py --mode linear --scale 1 --slots 10 --task "Text Generation"
 
 # Peak: Maximum load in the middle, symmetric profile
-python universal_clientML3.py --mode peak --scale 1 --slots 10
+python universal_clientML3.py --mode peak --scale 1 --slots 10 --task "Text Generation"
 
 # Camel: Two high peaks (slot 3 and 8), mimics real workload patterns
-python universal_clientML3.py --mode camel --scale 1 --slots 10
-
+python universal_clientML3.py --mode camel --scale 1 --slots 10 --task "Text Generation"
 """
 
 import argparse
@@ -36,34 +35,67 @@ def generate_profile(mode, slots):
 
 def generate_request(task, callback_url):
     if task == "Text Generation":
+        options = [
+            "The rocket launched from",
+            "Artificial intelligence is transforming",
+            "Once upon a time in a distant galaxy",
+            "Climate change affects"
+        ]
         return {
             "M": {
                 "task": "Text Generation",
-                "sequence": "The rocket launched from"
-            },
-            "D": random.randint(0, 4),
-            "C": callback_url
-        }
-    elif task == "Named Entity Recognition":
-        return {
-            "M": {
-                "task": "Named Entity Recognition",
-                "sequence": "Google is based in Mountain View"
-            },
-            "D": random.randint(0, 4),
-            "C": callback_url
-        }
-    elif task == "Question Answering":
-        return {
-            "M": {
-                "task": "Question Answering",
-                "question": "What is the capital of France?",
-                "context": "France is a country in Europe. Its capital city is Paris, which is known for the Eiffel Tower."
+                "sequence": random.choice(options)
             },
             "D": random.randint(0, 4),
             "C": callback_url
         }
 
+    elif task == "Named Entity Recognition":
+        options = [
+            "Barack Obama was the president of the United States.",
+            "OpenAI is headquartered in San Francisco.",
+            "Apple Inc. designs iPhones and MacBooks.",
+            "Tesla is building a Gigafactory in Berlin."
+        ]
+        return {
+            "M": {
+                "task": "Named Entity Recognition",
+                "sequence": random.choice(options)
+            },
+            "D": random.randint(0, 4),
+            "C": callback_url
+        }
+
+    elif task == "Question Answering":
+        qa_pairs = [
+            {
+                "question": "What is the capital of France?",
+                "context": "France is a country in Europe. Its capital city is Paris, which is known for the Eiffel Tower."
+            },
+            {
+                "question": "Who wrote Hamlet?",
+                "context": "William Shakespeare is the famous author of many plays including Hamlet, Macbeth and Othello."
+            },
+            {
+                "question": "What is the boiling point of water?",
+                "context": "Under normal conditions, water boils at 100 degrees Celsius."
+            },
+            {
+                "question": "What is the largest planet in our solar system?",
+                "context": "Jupiter is the biggest planet, followed by Saturn."
+            }
+        ]
+        qa = random.choice(qa_pairs)
+        return {
+            "M": {
+                "task": "Question Answering",
+                **qa
+            },
+            "D": random.randint(0, 4),
+            "C": callback_url
+        }
+
+        
 def main():
     parser = argparse.ArgumentParser(description="Universal client for probabilistic ML request generation.")
     parser.add_argument("--mode", type=str, required=True, help="Distribution type: random, linear, peak, camel")
@@ -72,11 +104,16 @@ def main():
     parser.add_argument("--delay", type=float, default=2.0, help="Delay in seconds between slots")
     parser.add_argument("--callback", type=str, default="http://localhost:5001/callback", help="Callback URL")
     parser.add_argument("--endpoint", type=str, default="http://localhost:5000/request", help="Frontend endpoint")
+    parser.add_argument("--task", type=str, default=None, choices=["Text Generation", "Named Entity Recognition", "Question Answering"],
+                        help="Optional: only send requests for the specified task")
     args = parser.parse_args()
 
     profile = generate_profile(args.mode, args.slots)
 
-    tasks = ["Text Generation", "Named Entity Recognition", "Question Answering"]
+    if args.task:
+        tasks = [args.task]
+    else:
+        tasks = ["Text Generation", "Named Entity Recognition", "Question Answering"]
 
     for slot, weight in enumerate(profile):
         n_requests = int(args.scale * weight * random.uniform(0.9, 1.1))
