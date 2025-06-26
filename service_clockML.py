@@ -20,9 +20,9 @@ MODEL_REGISTRY = {
         "high": pipeline("ner", model="Babelscape/wikineural-multilingual-ner", device=-1)
     },
     "Question Answering": {
-        "low": pipeline("question-answering", model="distilbert-base-cased-distilled-squad", device=-1),
-        "medium": pipeline("question-answering", model="distilbert-base-cased-distilled-squad", device=-1),
-        "high": pipeline("question-answering", model="distilbert-base-cased-distilled-squad", device=-1)
+    "low": pipeline("question-answering", model="distilbert-base-uncased-distilled-squad"),
+    "medium": pipeline("question-answering", model="deepset/roberta-base-squad2"),
+    "high": pipeline("question-answering", model="deepset/roberta-large-squad2")
     }
 }
 
