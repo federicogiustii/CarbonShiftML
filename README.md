@@ -1,8 +1,8 @@
 # Carbonshift-ML
 
-⚡ **Carbonshift-ML** è un’estensione del prototipo originale *Carbonshift* in cui il servizio S non è più un semplice Echo, ma esegue **task di Machine Learning** utilizzando modelli pre-addestrati da [HuggingFace](https://huggingface.co/).
+**Carbonshift-ML** è un’estensione del prototipo originale *Carbonshift* in cui il servizio S non è più un semplice Echo, ma esegue **task di Machine Learning** utilizzando modelli pre-addestrati da [HuggingFace](https://huggingface.co/).
 
-## 🚀 Differenze rispetto alla versione Echo
+## Differenze rispetto alla versione Echo
 
 - La versione precedente usava una strategia `Echo`, che si limitava a restituire il messaggio originale e il nome della strategia selezionata.
 - In questa versione, il servizio S esegue **reali inferenze ML** in base alla strategia selezionata da Carbonshift.
@@ -10,7 +10,7 @@
 
 ---
 
-## 🧠 Task ML supportati
+## Task ML supportati
 
 Il sistema supporta **tre task principali**, ciascuno con 3 strategie di potenza:
 
@@ -28,7 +28,7 @@ Il sistema supporta **tre task principali**, ciascuno con 3 strategie di potenza
 
 ---
 
-## 🧰 Componenti aggiornati
+## Componenti aggiornati
 
 - `service_clock_ML.py`: esegue i task ML dinamicamente.
 - `universal_clientML3.py`: genera workload con task diversi e distribuzioni di carico (random, linear, peak, camel).
@@ -40,7 +40,7 @@ Il sistema supporta **tre task principali**, ciascuno con 3 strategie di potenza
 
 ---
 
-## ⚙️ Intercambiabilità e configurazione
+## Intercambiabilità e configurazione
 
 Il client consente di selezionare dinamicamente:
 - Distribuzione (`--mode`)
