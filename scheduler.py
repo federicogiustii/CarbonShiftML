@@ -2,7 +2,15 @@ import pika
 import json
 import random
 import csv
-from carbonshift_optimizer_beta import assign_requests_carbonshift
+from carbonshift_optimizer_updated import (
+    assign_requests_carbonshift,
+    assign_requests_fixed,
+)
+import os
+
+current_tick_global = 0
+
+global_request_counter = 0  # Conta le richieste globalmente (NON si azzera mai)
 
 def load_strategies_csv(path="strategies.csv"):
     strategies = []
@@ -25,9 +33,13 @@ def load_scheduler_config_csv(path="scheduler_config.csv"):
     with open(path, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            config[row["parameter"]] = int(float(row["value"]))
+            value = row["value"]
+            try:
+                config[row["parameter"]] = int(float(value))
+            except ValueError:
+                config[row["parameter"]] = value  # lascia come stringa se non convertibile
     return config
-
+    
 def carbon_shift_strategy():
     return random.choice(["low", "medium", "high"])
 
@@ -55,8 +67,35 @@ def flush_to_slot_queues(channel, messages):
     epsilon = config.get("epsilon", 3)
     beta = config.get("beta", len(messages))
 
-    requests = [{'id': i, 'deadline': msg.get('D', 4)} for i, msg in enumerate(messages)]
-    assignment = assign_requests_carbonshift(requests, strategies, carbon_intensities, delta, epsilon, beta)
+    global global_request_counter
+    requests = []
+    for msg in messages:
+        requests.append({
+            'id': global_request_counter,
+            'deadline': msg.get('D', 4)
+        })
+        global_request_counter += 1
+
+
+
+    #assignment = assign_requests_carbonshift(
+    #    requests, strategies, carbon_intensities, delta, epsilon, beta
+    #)
+
+    mode = config.get("mode", "carbonshift")
+
+    if mode in ["always_low", "always_medium", "always_high", "naive"]:
+        fixed_mode = mode.replace("always_", "") if mode.startswith("always_") else mode
+        assignment = assign_requests_fixed(requests, fixed_mode, delta, strategies, carbon_intensities, current_tick_global)
+    else:
+        assignment = assign_requests_carbonshift(
+            requests,
+            strategies,
+            carbon_intensities,
+            delta,
+            epsilon,
+            beta
+        )
 
     for i, data in enumerate(messages):
         deadline = data.get("D", 4)  # prendi deadline, default 4 se mancante
@@ -94,7 +133,9 @@ def listen_for_ticks():
     channel.queue_bind(exchange="tick_exchange", queue=queue_name)
 
     def on_tick(ch, method, properties, body):
+        global current_tick_global
         tick = json.loads(body)["tick"]
+        current_tick_global = tick  # salva il tick globalmente
         print(f"[SCHEDULER] Tick ricevuto: {tick}")
         requests = consume_ingress_queue(channel)
         if requests:
