@@ -16,6 +16,7 @@ import argparse
 import requests
 import random
 import time
+import json
 
 def generate_profile(mode, slots):
     if mode == "random":
@@ -94,7 +95,6 @@ def generate_request(task, callback_url):
             "D": random.randint(0, 4),
             "C": callback_url
         }
-
         
 def main():
     parser = argparse.ArgumentParser(description="Universal client for probabilistic ML request generation.")
@@ -106,8 +106,9 @@ def main():
     parser.add_argument("--endpoint", type=str, default="http://localhost:5000/request", help="Frontend endpoint")
     parser.add_argument("--task", type=str, default=None, choices=["Text Generation", "Named Entity Recognition", "Question Answering"],
                         help="Optional: only send requests for the specified task")
-    args = parser.parse_args()
+    parser.add_argument("--output", type=str, default=None, help="File to save requests instead of sending")
 
+    args = parser.parse_args()
     profile = generate_profile(args.mode, args.slots)
 
     if args.task:
@@ -115,17 +116,29 @@ def main():
     else:
         tasks = ["Text Generation", "Named Entity Recognition", "Question Answering"]
 
+    all_requests = []
+
     for slot, weight in enumerate(profile):
         n_requests = int(args.scale * weight * random.uniform(0.9, 1.1))
         print(f"\n[CLIENT] Virtual slot {slot} → Sending {n_requests} requests...")
+
         for _ in range(n_requests):
             task = random.choice(tasks)
             msg = generate_request(task, args.callback)
-            try:
-                requests.post(args.endpoint, json=msg)
-            except Exception as e:
-                print(f"[CLIENT] Request error: {e}")
+            all_requests.append(msg)
+
+            if not args.output:
+                try:
+                    requests.post(args.endpoint, json=msg)
+                except Exception as e:
+                    print(f"[CLIENT] Request error: {e}")
+
         time.sleep(args.delay)
+
+    if args.output:
+        with open(args.output, "w") as f:
+            json.dump(all_requests, f, indent=2)
+        print(f"\n✅ Richieste salvate nel file: {args.output}")
 
 if __name__ == "__main__":
     main()
