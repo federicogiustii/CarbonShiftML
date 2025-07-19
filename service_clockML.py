@@ -4,6 +4,8 @@ import requests
 from transformers import pipeline
 import logging
 from transformers.utils import logging as hf_logging
+import csv
+from collections import defaultdict
 
 hf_logging.set_verbosity_error()
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -20,18 +22,33 @@ MODEL_REGISTRY = {
         "high": pipeline("ner", model="Babelscape/wikineural-multilingual-ner", device=-1)
     },
     "Question Answering": {
-    "low": pipeline("question-answering", model="distilbert-base-uncased-distilled-squad"),
-    "medium": pipeline("question-answering", model="deepset/roberta-base-squad2"),
-    "high": pipeline("question-answering", model="deepset/roberta-large-squad2")
+        "low": pipeline("question-answering", model="distilbert-base-uncased-distilled-squad"),
+        "medium": pipeline("question-answering", model="deepset/roberta-base-squad2"),
+        "high": pipeline("question-answering", model="deepset/roberta-large-squad2")
     }
 }
 
 current_slot = 0
 TOTAL_SLOTS = 5
+ALL_EXECUTED_STRATEGIES = []
+
+def load_strategy_costs(path="strategies.csv"):
+    costs = {}
+    with open(path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            costs[row["name"]] = {
+                "error": float(row["error"]),
+                "co2": float(row["duration"])
+            }
+    return costs
+
+STRATEGY_COSTS = load_strategy_costs()
 
 def service_s_execute(slot, request_data):
     payload = request_data.get("M", {})
     strategy = request_data.get("strategy", "low")
+    ALL_EXECUTED_STRATEGIES.append(strategy)
 
     if isinstance(payload, str):
         task = "Echo"
@@ -93,6 +110,7 @@ def consume_slot_queue(channel, queue_name, slot):
         else:
             break
 
+
 def listen_to_ticks():
     global current_slot
     connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
@@ -115,6 +133,7 @@ def listen_to_ticks():
         print(f"[SERVICE] Ricevuto tick {tick_data['tick']} → Slot {current_slot}")
         consume_slot_queue(channel, f"slot_queue_{current_slot}", current_slot)
         current_slot = (current_slot + 1) % TOTAL_SLOTS
+        
 
     channel.basic_consume(queue=tick_queue, on_message_callback=on_tick, auto_ack=True)
     print("[SERVICE] In ascolto dei tick...")
