@@ -6,7 +6,277 @@ import os
 from collections import defaultdict
 import random
 
-# only for benchmark
+
+# NAIVE
+def assign_requests_naive(requests, strategies, carbon_intensities, delta, epsilon, current_tick):
+
+    """
+    Politica Naive:
+    - Nessun vero time shifting: tutte le richieste eseguite allo slot (current_tick + 1) % delta
+    - Per ogni richiesta: calcolo progressivo dell'errore medio
+    - Se errore medio > epsilon → 'high', altrimenti → strategia random
+    """
+    assignment = {}
+    output_file = "output_assignment.csv"
+    file_exists = os.path.isfile(output_file)
+
+    strategies_map = {
+        s["name"]: {
+            "error": int(s["error"]),
+            "duration": int(s["duration"])
+        } for s in strategies
+    }
+
+    # Slot di esecuzione: uno avanti rispetto al tick attuale, circolare
+    next_slot = (current_tick + 1) % delta
+    ci_value = carbon_intensities[next_slot]
+
+    with open(output_file, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["request_id", "strategy", "time_slot", "emission", "error"])
+
+        rows = []
+        total_error = 0
+
+        for i, req in enumerate(requests):
+            req_id = req["id"]
+
+            # Calcolo errore medio cumulativo fino a questo punto
+            avg_error_so_far = total_error / i if i > 0 else 0
+
+            # Se l'errore medio è alto, assegna 'high', altrimenti una strategia casuale
+            if avg_error_so_far > epsilon:
+                selected_strategy = "high"
+            else:
+                selected_strategy = random.choice(["low", "medium", "high"])
+
+            error = strategies_map[selected_strategy]["error"]
+            duration = strategies_map[selected_strategy]["duration"]
+            emission = ci_value * duration
+
+            total_error += error
+            assignment[req_id] = (next_slot, selected_strategy)
+            rows.append([req_id, selected_strategy, next_slot, emission, error])
+
+        # Ordina righe per ID richiesta
+        rows.sort(key=lambda r: r[0])
+        for row in rows:
+            writer.writerow(row)
+
+        total_emission = sum(r[3] for r in rows)
+        slot_emissions = [0] * delta
+        for r in rows:
+            slot_emissions[r[2]] += r[3]
+
+        avg_error_final = round(total_error / len(rows), 4)
+
+        # Epilogo metriche
+        csvfile.write("\n")
+        csvfile.write(f"max_weighted_error_threshold: {total_error}\n")
+        csvfile.write(f"solver_status: Error\n")
+        csvfile.write(f"all_emissions:{total_emission}\n")
+        csvfile.write(f"slot_emissions:{slot_emissions}\n")
+        csvfile.write(f"all_errors:{avg_error_final}\n")
+        csvfile.write(f"solve_time: 0.0\n")
+
+    return assignment
+
+
+#NAIVE SHIFT
+def assign_requests_naive_shift(requests, strategies, carbon_intensities, delta):
+    """
+    Politica Naive Shift:
+    - Sposta le richieste entro la deadline nello slot con la minore carbon intensity
+    - Strategia fissa: "high"
+    - Salva i risultati nel file output_assignment.csv
+    """
+    assignment = {}
+    output_file = "output_assignment.csv"
+    file_exists = os.path.isfile(output_file)
+
+    strategies_map = {
+        s["name"]: {
+            "error": int(s["error"]),
+            "duration": int(s["duration"])
+        } for s in strategies
+    }
+
+    duration = strategies_map["high"]["duration"]
+    error = strategies_map["high"]["error"]
+
+    with open(output_file, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["request_id", "strategy", "time_slot", "emission", "error"])
+
+        rows = []
+
+        for req in requests:
+            req_id = req["id"]
+            deadline = min(req["deadline"], delta - 1)
+            best_slot = min(range(0, deadline + 1), key=lambda t: carbon_intensities[t])
+            emission = carbon_intensities[best_slot] * duration
+            assignment[req_id] = (best_slot, "high")
+            rows.append([req_id, "high", best_slot, emission, error])
+
+        rows.sort(key=lambda r: r[0])
+        for row in rows:
+            writer.writerow(row)
+
+        total_error = sum(r[4] for r in rows)
+        total_emission = sum(r[3] for r in rows)
+        slot_emissions = [0] * delta
+        for r in rows:
+            slot_emissions[r[2]] += r[3]
+
+        avg_error = round(total_error / len(rows), 4)
+        csvfile.write("\n")
+        csvfile.write(f"max_weighted_error_threshold: {total_error}\n")
+        csvfile.write(f"solver_status: GH\n")
+        csvfile.write(f"all_emissions:{total_emission}\n")
+        csvfile.write(f"slot_emissions:{slot_emissions}\n")
+        csvfile.write(f"all_errors:{avg_error}\n")
+        csvfile.write(f"solve_time: 0.0\n")
+
+    return assignment
+
+
+# RANDOM
+def assign_requests_random(requests, strategies, carbon_intensities, delta, current_tick):
+    """
+    Politica Random:
+    - Nessun time shifting: si esegue sempre nel current_tick + 1
+    - Strategia assegnata randomicamente tra low, medium, high
+    - Scrittura in output_assignment.csv
+    """
+
+    assignment = {}
+    output_file = "output_assignment.csv"
+    file_exists = os.path.isfile(output_file)
+
+    strategies_map = {
+        s["name"]: {
+            "error": int(s["error"]),
+            "duration": int(s["duration"])
+        } for s in strategies
+    }
+
+    next_slot = (current_tick + 1) % delta
+    ci_value = carbon_intensities[next_slot]
+
+    with open(output_file, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["request_id", "strategy", "time_slot", "emission", "error"])
+
+        rows = []
+
+        for req in requests:
+            req_id = req["id"]
+            strategy = random.choice(list(strategies_map.keys()))
+            duration = strategies_map[strategy]["duration"]
+            error = strategies_map[strategy]["error"]
+            emission = ci_value * duration
+
+            assignment[req_id] = (next_slot, strategy)
+            rows.append([req_id, strategy, next_slot, emission, error])
+
+        rows.sort(key=lambda r: r[0])
+        for row in rows:
+            writer.writerow(row)
+
+        total_error = sum(r[4] for r in rows)
+        total_emission = sum(r[3] for r in rows)
+        slot_emissions = [0] * delta
+        for r in rows:
+            slot_emissions[r[2]] += r[3]
+
+        avg_error = round(total_error / len(rows), 4)
+        csvfile.write("\n")
+        csvfile.write(f"max_weighted_error_threshold: {total_error}\n")
+        csvfile.write(f"solver_status: Random\n")
+        csvfile.write(f"all_emissions:{total_emission}\n")
+        csvfile.write(f"slot_emissions:{slot_emissions}\n")
+        csvfile.write(f"all_errors:{avg_error}\n")
+        csvfile.write(f"solve_time: 0.0\n")
+
+    return assignment
+
+# NAIVE CARBON
+def assign_requests_naive_carbon(requests, strategies, carbon_intensities, delta, current_tick):
+    """
+    Politica Naive Carbon Intensity:
+    - Nessun time shifting: esegue sempre nel current_tick + 1
+    - Strategia scelta in base alla carbon intensity dello slot:
+        • Verde (<119)  → 'high'
+        • Giallo (119–180) → 'medium'
+        • Marrone (>180) → 'low'
+    """
+
+    import os
+    import csv
+
+    assignment = {}
+    output_file = "output_assignment.csv"
+    file_exists = os.path.isfile(output_file)
+
+    strategies_map = {
+        s["name"]: {
+            "error": int(s["error"]),
+            "duration": int(s["duration"])
+        } for s in strategies
+    }
+
+    next_slot = (current_tick + 1) % delta
+    ci_value = carbon_intensities[next_slot]
+
+    # Nuove soglie secondo definizione Naive Carbon
+    if ci_value < 119:
+        selected_strategy = "high"
+    elif ci_value <= 180:
+        selected_strategy = "medium"
+    else:
+        selected_strategy = "low"
+
+    with open(output_file, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["request_id", "strategy", "time_slot", "emission", "error"])
+
+        rows = []
+
+        for req in requests:
+            req_id = req["id"]
+            duration = strategies_map[selected_strategy]["duration"]
+            error = strategies_map[selected_strategy]["error"]
+            emission = ci_value * duration
+
+            assignment[req_id] = (next_slot, selected_strategy)
+            rows.append([req_id, selected_strategy, next_slot, emission, error])
+
+        rows.sort(key=lambda r: r[0])
+        for row in rows:
+            writer.writerow(row)
+
+        total_error = sum(r[4] for r in rows)
+        total_emission = sum(r[3] for r in rows)
+        slot_emissions = [0] * delta
+        for r in rows:
+            slot_emissions[r[2]] += r[3]
+
+        avg_error = round(total_error / len(rows), 4)
+        csvfile.write("\n")
+        csvfile.write(f"max_weighted_error_threshold: {total_error}\n")
+        csvfile.write(f"solver_status: CI\n")
+        csvfile.write(f"all_emissions:{total_emission}\n")
+        csvfile.write(f"slot_emissions:{slot_emissions}\n")
+        csvfile.write(f"all_errors:{avg_error}\n")
+        csvfile.write(f"solve_time: 0.0\n")
+
+    return assignment
+
+# always_ strategies
 def assign_requests_fixed(requests, strategy_mode, delta, strategies, carbon_intensities, current_tick):
     """
     Assegna tutte le richieste con una strategia fissa (o casuale se 'naive') e salva l'output su CSV.
@@ -205,9 +475,8 @@ def assign_requests_carbonshift(requests, strategies, carbon_intensities, delta,
                             duration = int(strategies[s]["duration"])
                             error = int(strategies[s]["error"])
                             #emission = carbon[t] * duration #* group_size  # emission per block of requests
-                            # SECONDO ME NON SERVE MOLTIPLICARE PER RATIO, E' GIA' CONSIDERATO
                             #emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration * group_size  # emission per block of requests
-                            emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration
+                            emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration * group_size
                             assignment[req_id] = (t, strat_name)
                             rows.append([req_id, strat_name, t, emission, error])
 
