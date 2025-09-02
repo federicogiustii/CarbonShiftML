@@ -7,25 +7,43 @@ from transformers.utils import logging as hf_logging
 import csv
 from collections import defaultdict
 
+# === Caricamento input da file ===
+with open("ner_article.txt", "r", encoding="utf-8") as f:
+    NER_TEXT = f.read()
+
+with open("qa_article.txt", "r", encoding="utf-8") as f:
+    QA_CONTEXT = f.read()
+
+with open("textgen_article.txt", "r", encoding="utf-8") as f:
+    TEXTGEN_PROMPT = f.read()
+
 hf_logging.set_verbosity_error()
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
 MODEL_REGISTRY = {
     "Text Generation": {
-        "low": pipeline("text-generation", model="sshleifer/tiny-gpt2", device=-1),
-        "medium": pipeline("text-generation", model="gpt2", device=-1),
-        "high": pipeline("text-generation", model="gpt2-xl", device=-1)
+        "low":    "gpt2-large",                                              # 22.1
+        "medium": "gpt2-xl",                                                 # 17.5
+        "high":   "EleutherAI/gpt-neo-1.3B"                                  # 13.1
+    }, 
+    "Named Entity Recognition": {                              
+        "low":    "dslim/bert-base-NER",                                     # 8.7
+        "medium": "tner/roberta-large-conll2003",                            # 8.3  
+        "high":   "Jean-Baptiste/roberta-large-ner-english"                  # 2.5
     },
-    "Named Entity Recognition": {
-        "low": pipeline("ner", model="dslim/bert-base-NER", device=-1),
-        "medium": pipeline("ner", model="Jean-Baptiste/roberta-large-ner-english", device=-1),
-        "high": pipeline("ner", model="Babelscape/wikineural-multilingual-ner", device=-1)
-    },
-    "Question Answering": {
-        "low": pipeline("question-answering", model="distilbert-base-uncased-distilled-squad"),
-        "medium": pipeline("question-answering", model="deepset/roberta-base-squad2"),
-        "high": pipeline("question-answering", model="deepset/roberta-large-squad2")
+    "Question Answering": {                                     
+        "low":    "distilbert-base-cased-distilled-squad",                   # 13.0
+        "medium": "deepset/roberta-base-squad2",                             # 8.2
+        "high":   "bert-large-uncased-whole-word-masking-finetuned-squad"    # 6.85
     }
+}
+
+
+# === Mapping dei task per HuggingFace ===
+TASK_MAPPING = {
+    "Text Generation": "text-generation",
+    "Named Entity Recognition": "ner",
+    "Question Answering": "question-answering"
 }
 
 current_slot = 0
@@ -55,25 +73,28 @@ def service_s_execute(slot, request_data):
         result = f"[Echo] {payload}"
     else:
         task = payload.get("task", "Echo")
-        model = MODEL_REGISTRY.get(task, {}).get(strategy)
-        if not model:
+        model_id = MODEL_REGISTRY.get(task, {}).get(strategy)
+
+        if not model_id:
             print(f"[SERVICE] Task o strategia non riconosciuti: {task} - {strategy}")
             return
 
+        model = pipeline(task=TASK_MAPPING[task], model=model_id)
+
         try:
             if task == "Text Generation":
-                input_text = payload.get("sequence", "This is a test")
-                result_data = model(input_text, max_length=50, truncation=True)
+                input_text = payload.get("sequence", TEXTGEN_PROMPT)
+                result_data = model(input_text, max_new_tokens=100)
                 result = result_data[0]["generated_text"]
 
             elif task == "Named Entity Recognition":
-                input_text = payload.get("sequence", "OpenAI is based in San Francisco")
+                input_text = payload.get("sequence", NER_TEXT)
                 result_data = model(input_text)
-                result = result_data[0]["entity"]
+                result = result_data[0]["entity"] if result_data else "[no entity]"
 
             elif task == "Question Answering":
-                question = payload.get("question", "")
-                context = payload.get("context", "")
+                question = payload.get("question", "What is this article about?")
+                context = payload.get("context", QA_CONTEXT)
                 result_data = model(question=question, context=context)
 
                 if isinstance(result_data, list) and result_data:
