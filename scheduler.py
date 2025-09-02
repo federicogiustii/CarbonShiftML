@@ -5,6 +5,10 @@ import csv
 from carbonshift_optimizer_updated import (
     assign_requests_carbonshift,
     assign_requests_fixed,
+    assign_requests_naive_carbon,
+    assign_requests_random,
+    assign_requests_naive,
+    assign_requests_naive_shift
 )
 import os
 
@@ -54,7 +58,7 @@ def consume_ingress_queue(channel):
             break
     return messages
 
-def flush_to_slot_queues(channel, messages):
+def flush_to_slot_queues(channel, messages, current_tick):
     # Exchange per slot topic
     channel.exchange_declare(exchange="slot_exchange", exchange_type="topic")
 
@@ -84,9 +88,22 @@ def flush_to_slot_queues(channel, messages):
 
     mode = config.get("mode", "carbonshift")
 
-    if mode in ["always_low", "always_medium", "always_high", "naive"]:
-        fixed_mode = mode.replace("always_", "") if mode.startswith("always_") else mode
-        assignment = assign_requests_fixed(requests, fixed_mode, delta, strategies, carbon_intensities, current_tick_global)
+    if mode in ["always_low", "always_medium", "always_high"]:
+        fixed_mode = mode.replace("always_", "")
+        assignment = assign_requests_fixed(requests, fixed_mode, delta, strategies, carbon_intensities, current_tick)
+
+    elif mode == "naive_carbon":
+        assignment = assign_requests_naive_carbon(requests, strategies, carbon_intensities, delta, current_tick)
+
+    elif mode == "naive":
+        assignment = assign_requests_naive(requests, strategies, carbon_intensities, delta, epsilon, current_tick)
+
+    elif mode == "naive_shift":
+        assignment = assign_requests_naive_shift(requests, strategies, carbon_intensities, delta)
+
+    elif mode == "random":
+        assignment = assign_requests_random(requests, strategies, carbon_intensities, delta, current_tick)
+
     else:
         assignment = assign_requests_carbonshift(
             requests,
@@ -98,8 +115,11 @@ def flush_to_slot_queues(channel, messages):
         )
 
     for i, data in enumerate(messages):
-        deadline = data.get("D", 4)  # prendi deadline, default 4 se mancante
-        slot, strategy = assignment[i]
+        deadline = data.get("D", 4)
+        request_id = requests[i]['id']  # prendi l'ID reale della richiesta
+        if request_id not in assignment:
+            raise KeyError(f"ID {request_id} non trovato in assignment")
+        slot, strategy = assignment[request_id]
         data["slot"] = slot
         data["strategy"] = strategy
 
@@ -140,7 +160,7 @@ def listen_for_ticks():
         requests = consume_ingress_queue(channel)
         if requests:
             print(f"[SCHEDULER] Prelevo {len(requests)} richieste da 'ingress_queue'")
-            flush_to_slot_queues(channel, requests)
+            flush_to_slot_queues(channel, requests, current_tick_global)
         else:
             print("[SCHEDULER] Nessuna richiesta da elaborare.")
 
