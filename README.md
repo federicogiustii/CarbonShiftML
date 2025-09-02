@@ -14,19 +14,17 @@
 
 Il sistema supporta **tre task principali**, ciascuno con 3 strategie di potenza:
 
-| Task | Strategia | Modello HuggingFace | Descrizione |
-|------|-----------|----------------------|-------------|
-| **Text Generation** | low | `sshleifer/tiny-gpt2` | Versione compatta |
-|  | medium | `gpt2` | Modello standard |
-|  | high | `gpt2-xl` | Modello di grandi dimensioni |
-| **Named Entity Recognition (NER)** | low | `dslim/bert-base-NER` | Modello base BERT |
-|  | medium | `Jean-Baptiste/roberta-large-ner-english` | Roberta large per NER |
-|  | high | `Babelscape/wikineural-multilingual-ner` | Multilingua, pesante |
-| **Question Answering (QA)** | low | `distilbert-base-uncased-distilled-squad` | DistilBERT |
-|  | medium | `deepset/roberta-base-squad2` | Roberta base |
-|  | high | `deepset/roberta-large-squad2` | Roberta large, più preciso |
-
----
+| Task                        | Strategia   | Modello HuggingFace                                              | Descrizione                                                   |
+|-----------------------------|-------------|------------------------------------------------------------------|---------------------------------------------------------------|
+| **Text Generation**         | low         | `gpt2-large`                                                     | Modello compatto ma più espressivo di GPT2 base              |
+|                             | medium      | `gpt2-xl`                                                        | Estensione di GPT2 con maggiore capacità generativa           |
+|                             | high        | `EleutherAI/gpt-neo-1.3B`                                        | Alternativa open-source a GPT-3, più profonda                 |
+| **Named Entity Recognition**| low         | `dslim/bert-base-NER`                                            | BERT base addestrato su CoNLL-2003                            |
+|                             | medium      | `tner/roberta-large-conll2003`                                   | Roberta large ottimizzato per NER                            |
+|                             | high        | `Jean-Baptiste/roberta-large-ner-english`                        | Roberta large con prestazioni state-of-the-art                |
+| **Question Answering**      | low         | `distilbert-base-uncased-distilled-squad`                        | Versione distillata di BERT per risposte rapide              |
+|                             | medium      | `deepset/roberta-base-squad2`                                    | Roberta base addestrato su SQuAD2                             |
+|                             | high        | `bert-large-uncased-whole-word-masking-finetuned-squad`          | BERT large fine-tuned con masking completo                    |
 
 ## Componenti aggiornati
 
