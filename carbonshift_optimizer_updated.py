@@ -8,10 +8,10 @@ import random
 
 
 # NAIVE
-def assign_requests_naive(requests, strategies, carbon_intensities, delta, epsilon, current_tick):
+def assign_requests_naive_error(requests, strategies, carbon_intensities, delta, epsilon, current_tick):
 
     """
-    Politica Naive:
+    Politica Naive Error:
     - Nessun vero time shifting: tutte le richieste eseguite allo slot (current_tick + 1) % delta
     - Per ogni richiesta: calcolo progressivo dell'errore medio
     - Se errore medio > epsilon → 'high', altrimenti → strategia random
@@ -476,7 +476,7 @@ def assign_requests_carbonshift(requests, strategies, carbon_intensities, delta,
                             error = int(strategies[s]["error"])
                             #emission = carbon[t] * duration #* group_size  # emission per block of requests
                             #emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration * group_size  # emission per block of requests
-                            emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration * group_size
+                            emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration #* group_size
                             assignment[req_id] = (t, strat_name)
                             rows.append([req_id, strat_name, t, emission, error])
 
