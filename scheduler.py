@@ -7,7 +7,7 @@ from carbonshift_optimizer_updated import (
     assign_requests_fixed,
     assign_requests_naive_carbon,
     assign_requests_random,
-    assign_requests_naive,
+    assign_requests_naive_error,
     assign_requests_naive_shift
 )
 import os
@@ -95,8 +95,8 @@ def flush_to_slot_queues(channel, messages, current_tick):
     elif mode == "naive_carbon":
         assignment = assign_requests_naive_carbon(requests, strategies, carbon_intensities, delta, current_tick)
 
-    elif mode == "naive":
-        assignment = assign_requests_naive(requests, strategies, carbon_intensities, delta, epsilon, current_tick)
+    elif mode == "naive_error":
+        assignment = assign_requests_naive_error(requests, strategies, carbon_intensities, delta, epsilon, current_tick)
 
     elif mode == "naive_shift":
         assignment = assign_requests_naive_shift(requests, strategies, carbon_intensities, delta)
@@ -139,6 +139,7 @@ def flush_to_slot_queues(channel, messages, current_tick):
 """)
 
 def listen_for_ticks():
+
     connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
     channel = connection.channel()
 
