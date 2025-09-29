@@ -170,5 +170,4 @@ def listen_to_ticks():
     channel.start_consuming()
 
 if __name__ == "__main__":
-    print(TOTAL_SLOTS)
     listen_to_ticks()
