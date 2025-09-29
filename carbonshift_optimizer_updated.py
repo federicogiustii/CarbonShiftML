@@ -6,6 +6,9 @@ import os
 from collections import defaultdict
 import random
 
+# conversione in gCO2 basata sul consumo del server
+server_kwh_per_hour = 0.05    #  Consumo tipico di un server in kilowattora
+server_wh_per_second = server_kwh_per_hour / 3600    # Conversione in watt-secondo
 
 # NAIVE
 def assign_requests_naive_error(requests, strategies, carbon_intensities, delta, epsilon, current_tick):
@@ -54,6 +57,8 @@ def assign_requests_naive_error(requests, strategies, carbon_intensities, delta,
             error = strategies_map[selected_strategy]["error"]
             duration = strategies_map[selected_strategy]["duration"]
             emission = ci_value * duration
+
+            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
 
             total_error += error
             assignment[req_id] = (next_slot, selected_strategy)
@@ -117,6 +122,8 @@ def assign_requests_naive_shift(requests, strategies, carbon_intensities, delta)
             deadline = min(req["deadline"], delta - 1)
             best_slot = min(range(0, deadline + 1), key=lambda t: carbon_intensities[t])
             emission = carbon_intensities[best_slot] * duration
+
+            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
             assignment[req_id] = (best_slot, "high")
             rows.append([req_id, "high", best_slot, emission, error])
 
@@ -179,6 +186,7 @@ def assign_requests_random(requests, strategies, carbon_intensities, delta, curr
             error = strategies_map[strategy]["error"]
             emission = ci_value * duration
 
+            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
             assignment[req_id] = (next_slot, strategy)
             rows.append([req_id, strategy, next_slot, emission, error])
 
@@ -251,6 +259,8 @@ def assign_requests_naive_carbon(requests, strategies, carbon_intensities, delta
             duration = strategies_map[selected_strategy]["duration"]
             error = strategies_map[selected_strategy]["error"]
             emission = ci_value * duration
+
+            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
 
             assignment[req_id] = (next_slot, selected_strategy)
             rows.append([req_id, selected_strategy, next_slot, emission, error])
@@ -325,6 +335,8 @@ def assign_requests_fixed(requests, strategy_mode, delta, strategies, carbon_int
             error = strategies_map[strategy]["error"]
             duration = strategies_map[strategy]["duration"]
             emission = carbon_intensities[slot] * duration
+
+            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
 
             assignment[req_id] = (slot, strategy)
             rows.append([req_id, strategy, slot, emission, error])
@@ -477,6 +489,9 @@ def assign_requests_carbonshift(requests, strategies, carbon_intensities, delta,
                             #emission = carbon[t] * duration #* group_size  # emission per block of requests
                             #emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration * group_size  # emission per block of requests
                             emission = solver.Value(x[(b, s, t)]) * carbon_intensities[t] * duration #* group_size
+
+                            emission = round(emission * server_wh_per_second, 6)*1000 # Emissione in milligrammi di CO2
+
                             assignment[req_id] = (t, strat_name)
                             rows.append([req_id, strat_name, t, emission, error])
 
